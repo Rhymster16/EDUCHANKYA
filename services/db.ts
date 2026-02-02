@@ -1,4 +1,5 @@
-import { Project, Candidate, Idea, LearningPath, Institution, UserProfile } from '../types';
+
+import { Project, Candidate, Idea, LearningPath, Institution, UserProfile, Message, Resource } from '../types';
 
 // This service mimics Firebase Firestore behavior using LocalStorage
 // so the application is fully functional without requiring the user
@@ -11,25 +12,64 @@ const STORAGE_KEYS = {
   CANDIDATES: 'educhanakya_candidates',
   IDEAS: 'educhanakya_ideas',
   LEARNING: 'educhanakya_learning',
+  MESSAGES: 'educhanakya_messages',
+  RESOURCES: 'educhanakya_resources'
 };
 
 // Seed Data
 const SEED_INSTITUTIONS: Institution[] = [
   { id: 'inst_1', name: 'Indian Institute of Technology, Bombay (Virtual)', domain: 'iitb.ac.in' },
-  { id: 'inst_2', name: 'Delhi Technological University (Virtual)', domain: 'dtu.ac.in' },
-  { id: 'inst_3', name: 'Stanford University (Virtual)', domain: 'stanford.edu' },
 ];
 
 const SEED_USERS: UserProfile[] = [
-  { id: 'u1', institutionId: 'inst_1', name: 'Aarav Patel', email: 'aarav@iitb.ac.in', role: 'Student', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aarav' },
-  { id: 'u2', institutionId: 'inst_1', name: 'Dr. S. Gupta', email: 'gupta@iitb.ac.in', role: 'Faculty', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Gupta' },
-  { id: 'u3', institutionId: 'inst_2', name: 'Priya Singh', email: 'priya@dtu.ac.in', role: 'Student', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Priya' },
+  { 
+      id: 'u_admin', 
+      institutionId: 'inst_1', 
+      name: 'Dr. R. K. Director', 
+      email: 'director@iitb.ac.in', 
+      role: 'Admin', 
+      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Director',
+      phoneNumber: '+91-9876543210'
+  },
+  { 
+      id: 'u1', 
+      institutionId: 'inst_1', 
+      name: 'Aarav Patel', 
+      email: 'aarav@iitb.ac.in', 
+      role: 'Student', 
+      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aarav',
+      batch: '2022-2026',
+      course: 'B.Tech CS',
+      year: '3rd Year',
+      phoneNumber: '+91-9988776655'
+  },
+  { 
+      id: 'u2', 
+      institutionId: 'inst_1', 
+      name: 'Dr. S. Gupta', 
+      email: 'gupta@iitb.ac.in', 
+      role: 'Faculty', 
+      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Gupta',
+      phoneNumber: '+91-8877665544',
+      subjects: ['Data Structures', 'Algorithms']
+  },
+  { 
+      id: 'u3', 
+      institutionId: 'inst_1', 
+      name: 'Priya Singh', 
+      email: 'priya@iitb.ac.in', 
+      role: 'Student', 
+      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Priya',
+      batch: '2023-2027',
+      course: 'B.Tech IT',
+      year: '2nd Year',
+      phoneNumber: '+91-7766554433'
+  },
 ];
 
 const SEED_CANDIDATES: Candidate[] = [
-  { id: 'c1', institutionId: 'inst_1', name: 'Aarav Patel', role: 'Frontend Dev', skills: ['React', 'TypeScript'], projectCount: 5, avgScore: 88 },
-  { id: 'c2', institutionId: 'inst_1', name: 'Zara Khan', role: 'Data Scientist', skills: ['Python', 'TensorFlow'], projectCount: 3, avgScore: 92 },
-  { id: 'c3', institutionId: 'inst_2', name: 'Liam Smith', role: 'Full Stack', skills: ['Node.js', 'Postgres'], projectCount: 7, avgScore: 85 },
+  { id: 'u1', institutionId: 'inst_1', name: 'Aarav Patel', role: 'Frontend Dev', skills: ['React', 'TypeScript'], projectCount: 5, avgScore: 88 },
+  { id: 'u3', institutionId: 'inst_1', name: 'Priya Singh', role: 'Data Scientist', skills: ['Python', 'TensorFlow'], projectCount: 3, avgScore: 92 },
 ];
 
 const SEED_IDEAS: Idea[] = [
@@ -40,9 +80,23 @@ const SEED_IDEAS: Idea[] = [
         description: 'Autonomous drones to deliver food from canteen to hostels.',
         requiredSkills: ['Robotics', 'Python', 'Computer Vision'],
         openRoles: ['Drone Pilot', 'AI Engineer'],
-        applicants: [],
+        applicants: ['u3'],
+        team: ['u1'],
+        status: 'Open',
         createdAt: new Date().toISOString(),
-        authorName: 'Aarav Patel'
+        authorName: 'Aarav Patel',
+        authorId: 'u1'
+    }
+];
+
+const SEED_RESOURCES: Resource[] = [
+    {
+        id: 'res_1',
+        institutionId: 'inst_1',
+        title: 'Advanced Algorithms Lecture Notes',
+        description: 'PDF notes for Graph Theory and Dynamic Programming.',
+        authorName: 'Dr. S. Gupta',
+        postedAt: new Date().toISOString()
     }
 ];
 
@@ -56,6 +110,7 @@ class MockFirestore {
     this.initSeed(STORAGE_KEYS.USERS, SEED_USERS);
     this.initSeed(STORAGE_KEYS.CANDIDATES, SEED_CANDIDATES);
     this.initSeed(STORAGE_KEYS.IDEAS, SEED_IDEAS);
+    this.initSeed(STORAGE_KEYS.RESOURCES, SEED_RESOURCES);
     this.log("SYSTEM", "Backend Service Initialized");
     this.log("DB", "Seed data integrity check complete");
   }
@@ -167,14 +222,55 @@ class MockFirestore {
   }
 
   async createUser(user: Omit<UserProfile, 'id'>): Promise<UserProfile> {
+      // Create user with a short, readable ID for easier manual login if role is student
+      const prefix = user.role === 'Admin' ? 'admin' : user.role === 'Faculty' ? 'fac' : 'stu';
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
       const newUser = { 
           ...user, 
-          id: `u_${Math.random().toString(36).substr(2, 6)}`,
+          id: `${prefix}_${randomSuffix}`,
           avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`
       };
       await this.addCollectionItem('users', newUser);
-      this.log("AUTH", `Created new user: ${user.name}`);
+      
+      // If student, also create candidate profile
+      if (user.role === 'Student') {
+           await this.addCollectionItem('candidates', { 
+            id: newUser.id,
+            institutionId: user.institutionId, 
+            name: user.name, 
+            role: user.course || 'Student', 
+            skills: [], 
+            projectCount: 0, 
+            avgScore: 0 
+        });
+      }
+
+      this.log("AUTH", `Created new user: ${user.name} (ID: ${newUser.id})`);
       return newUser;
+  }
+
+  // NEW: Bulk Create for Admin CSV upload
+  async bulkCreateUsers(institutionId: string, users: Partial<UserProfile>[]): Promise<UserProfile[]> {
+      const createdUsers: UserProfile[] = [];
+      for (const u of users) {
+          if (u.name && u.role) {
+              const fullUser: Omit<UserProfile, 'id'> = {
+                  institutionId,
+                  name: u.name,
+                  email: u.email || `${u.name.toLowerCase().replace(' ', '.')}@inst.edu`,
+                  role: u.role as 'Student'|'Faculty'|'Admin',
+                  avatar: '',
+                  batch: u.batch,
+                  course: u.course,
+                  year: u.year,
+                  phoneNumber: u.phoneNumber,
+                  subjects: u.subjects
+              };
+              const newUser = await this.createUser(fullUser);
+              createdUsers.push(newUser);
+          }
+      }
+      return createdUsers;
   }
 
   async login(institutionId: string, userId: string): Promise<UserProfile | null> {
@@ -192,6 +288,26 @@ class MockFirestore {
         this.log("AUTH", `Login FAILED: User not found`);
     }
     return user || null;
+  }
+
+  // Specific method to get users for Admin/Faculty listing
+  async getUsersByInstitution(institutionId: string): Promise<UserProfile[]> {
+      const users = this.read<UserProfile>(STORAGE_KEYS.USERS);
+      return users.filter(u => u.institutionId === institutionId);
+  }
+
+  async appendUserSkills(userId: string, tags: string[]) {
+    const key = STORAGE_KEYS.CANDIDATES;
+    const candidates = this.read<Candidate>(key);
+    const updated = candidates.map(c => {
+        if (c.id === userId) {
+            const newSkills = Array.from(new Set([...c.skills, ...tags]));
+            return { ...c, skills: newSkills };
+        }
+        return c;
+    });
+    this.write(key, updated);
+    this.log("UPDATE", `Appended skills to user ${userId}: ${tags.join(', ')}`);
   }
 }
 

@@ -1,8 +1,11 @@
+
 export interface Institution {
   id: string;
   name: string;
   domain: string;
 }
+
+export type ProjectStatus = 'Pending' | 'In Progress' | 'Completed';
 
 export interface Project {
   id: string;
@@ -18,7 +21,31 @@ export interface Project {
   critique?: ProjectCritique;
   handoverNote?: string; // Teacher's note for future students
   recommendedPathId?: string; // Link to a Learning Path
-  authorName?: string;
+  authorId: string;
+  authorName: string;
+  status: ProjectStatus;
+  assignedFacultyId?: string; // ID of faculty reviewing this
+  sharedResources?: string[]; // Links to external folders/drive
+}
+
+export interface Message {
+  id: string;
+  institutionId: string;
+  projectId: string; // OR ideaId
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: string;
+}
+
+export interface Resource {
+  id: string;
+  institutionId: string;
+  title: string;
+  description: string;
+  link?: string;
+  authorName: string;
+  postedAt: string;
 }
 
 export interface RefactoringSuggestion {
@@ -53,9 +80,12 @@ export interface Idea {
   description: string;
   requiredSkills: string[];
   openRoles: string[]; 
-  applicants: string[]; // User IDs or Names
+  applicants: string[]; // User IDs
+  team: string[]; // User IDs of accepted members
+  status: 'Open' | 'Closed' | 'In Progress';
   createdAt: string;
   authorName: string;
+  authorId: string;
 }
 
 export interface LearningPath {
@@ -76,7 +106,9 @@ export enum ViewState {
   LEARNING = 'LEARNING',
   TALENT = 'TALENT',
   IDEATION = 'IDEATION',
+  NOTES = 'NOTES',
   SYSTEM = 'SYSTEM',
+  ADMIN = 'ADMIN',
 }
 
 export interface UserProfile {
@@ -84,6 +116,12 @@ export interface UserProfile {
   institutionId: string;
   name: string;
   email: string;
-  role: 'Student' | 'Faculty';
+  role: 'Student' | 'Faculty' | 'Admin';
   avatar: string;
+  // Academic Details
+  phoneNumber?: string;
+  batch?: string; // e.g. 2024-2028
+  course?: string; // e.g. B.Tech CS
+  year?: string; // e.g. 2nd Year
+  subjects?: string[]; // For Faculty: List of subjects taught
 }
